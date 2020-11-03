@@ -1,0 +1,36 @@
+#!/bin/bash
+#Get ip address from user
+ipaddr=$1
+#create a session name replaceing . with _
+session=${ipaddr//./_}
+#create directory to work in
+if [[ ! -d "$session" ]]
+then
+    echo "$session does not exists on your filesystem, creating."
+    mkdir $session
+fi
+#work_dir
+work_dir=${PWD}/${session}
+
+# Check if the session exists, discarding output
+# We can check $? for the exit status (zero for success, non-zero for failure)
+tmux has-session -t $session 2>/dev/null
+
+if [ $? != 0 ]; then
+    # Set up your session
+    tmux start-server
+    tmux new-session -d -s $session -c $work_dir -n RECON
+    #select pane 1 and run nmap
+    tmux selectp -t 1
+    tmux send-keys "sudo nmap -Pn -sC -sV -oA $session $ipaddr" C-m
+    #Services for creating web services, c2 etc
+    tmux new-window -t $session:1 -n SERVICES
+    #Once we have a foothold migrate to last tab to keep track of actions on
+    tmux new-window -t $session:2 -n POST
+    #return to main recon window
+    tmux select-window -t $session:0
+fi
+
+# Attach to created session
+tmux attach-session -t $session
+
